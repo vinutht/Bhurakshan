@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:web="http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd" id="WebApp_ID" version="3.0">  
+  <welcome-file-list>
+    <welcome-file>index.jsp</welcome-file>
+  </welcome-file-list>   
+  
+	<security-constraint>
+		<web-resource-collection>
+			<web-resource-name>Customer Home</web-resource-name>
+			<description>application security constraints</description>
+			<url-pattern>/PS/*</url-pattern>
+			<http-method>GET</http-method>
+			<http-method>POST</http-method>
+		</web-resource-collection>
+		<auth-constraint>
+			<role-name>CUSTOMER</role-name>
+			<role-name>ADMIN</role-name>
+		</auth-constraint>
+	</security-constraint>
+	
+	<!-- <login-config>
+		<auth-method>BASIC</auth-method>
+		<realm-name>Please provide the credentials</realm-name>
+	</login-config>  --> 
+	
+	<login-config>
+		<auth-method>FORM</auth-method>
+		<form-login-config>
+			<form-login-page>/unsecured/login</form-login-page>
+			<form-error-page>/LoginError.html</form-error-page>
+		</form-login-config>
+	</login-config>	
+	
+    <servlet>
+        <servlet-name>Redirect</servlet-name>
+        <servlet-class>com.ps.web.security.RedirectServlet</servlet-class>
+    </servlet>	
+	
+    <servlet-mapping>
+        <servlet-name>Redirect</servlet-name>
+        <url-pattern>/unsecured/login</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>Redirect</servlet-name>
+        <url-pattern>/unsecured/logout</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>Redirect</servlet-name>
+        <url-pattern>/unsecured/loginError</url-pattern>
+    </servlet-mapping>	
+	
+	<security-role>
+		<role-name>CUSTOMER</role-name>		
+	</security-role> 		
+	
+	<security-role>		
+		<role-name>ADMIN</role-name>
+	</security-role> 
+	
+</web-app>

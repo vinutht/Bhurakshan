@@ -1,0 +1,236 @@
+// Copyright 2009-2011 Juniper Networks, Inc. All rights reserved.
+package net.juniper.jmp.cmp.sessionmgt;
+
+import java.io.IOException;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import net.juniper.jmp.cmp.system.JxServiceLocator;
+import net.juniper.jmp.cmp.systemService.security.UserManager;
+import net.juniper.jmp.cmp.systemService.security.UserTO;
+import net.juniper.jmp.cmp.systemService.utilities.SystemServiceConstants;
+import net.juniper.jmp.cmp.xmlconfig.application.AppSettingsManager;
+
+import org.apache.xml.security.exceptions.Base64DecodingException;
+import org.apache.xml.security.utils.Base64;
+
+/**
+ * Created by IntelliJ IDEA.
+ * User: jyhchia
+ * Date: Oct 25, 2008
+ */
+public class JxRedirectServlet extends HttpServlet {
+  private static boolean userDisabled = false;
+  
+  protected void service(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse)
+          throws ServletException, IOException {
+    final String svlpath = httpServletRequest.getServletPath();
+    final HttpSession s = httpServletRequest.getSession();
+    boolean isLogout = false;
+
+    Boolean userLocked = (Boolean)s.getAttribute("userLocked");
+
+    // used by security manager to redirect things
+    if ("/unsecured/logout".equals(svlpath)) {
+      if (s != null) {
+        s.invalidate();
+        isLogout = true;
+      }
+    } else if ("/unsecured/login".equals(svlpath)) {
+      if (s != null) {
+    	s.setAttribute("userIpAddr", httpServletRequest.getRemoteAddr()); // set up some user basic info
+      }
+    } else if ("/unsecured/loginError".equals(svlpath)) {
+      if (userDisabled) {
+        httpServletRequest.setAttribute("LoginError", SystemServiceConstants.USERS.USER_DISABLED);
+      }else if (userLocked != null && userLocked == true) {
+        httpServletRequest.setAttribute("LoginError", SystemServiceConstants.USERS.ENABLE_LOCKED_OUT_USER);
+      } else {
+        httpServletRequest.setAttribute("LoginError", "True");
+      }
+    } else {
+      throw new ServletException("JxRedirectServlet: operation '" + svlpath + "' not supported!");
+    }
+    redirectToLogin(httpServletRequest, httpServletResponse, isLogout);
+  }
+
+  private void redirectToLogin(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, boolean isLogout)
+          throws IOException, ServletException {
+    String pageName = (isLogout ? "/logout.jsp" : "/login.jsp");  
+    //if (!isLogout ) {
+    if (!isLogout && httpServletRequest.getQueryString() != null && httpServletRequest.getQueryString().contains("JunosSpaceID")) {
+      String user = httpServletRequest.getParameter("JunosSpaceID");
+      String opass = httpServletRequest.getParameter("JunosSpacePW");
+      String pass = null;
+      try {
+        pass = new String(Base64.decode(opass));
+      } catch (Base64DecodingException e) {
+          pass = ""; //TBD needs to find out the best way to handle this
+      }
+      //httpServletResponse.sendRedirect("j_security_check?j_username=" + "super" + "&j_password=" + "juniper123");
+      httpServletResponse.sendRedirect("j_security_check?j_username=" + user + "&j_password=" + pass);
+    } else {
+      RequestDispatcher dispatcher = this.getServletContext().getContext("/sm").getRequestDispatcher(pageName);
+      if (dispatcher != null) {
+        httpServletResponse.setContentType("text/html");
+        dispatcher.include(httpServletRequest, httpServletResponse);
+      }
+    }
+  }
+
+  /*
+   *  check if the user is disabled. This flag is used for showing the disabled user message
+   */
+  public static boolean isUserDisabled() {
+    return userDisabled;
+  }
+
+  public static void setUserDisabled(boolean state) {
+    userDisabled = state;
+  }
+
+  
+    public static boolean isPasswordExpired(String userName){
+       boolean passwordExpired = false;
+       UserManager userManager = JxServiceLocator.lookup("cmp.sm.UserManagerEJB");
+       UserTO user = userManager.getUser(userName);
+       if ((user.getExpiryDate() != null) && (user.getPassword() != null))
+       {
+           //if password is valid but expired
+           long currentTime =  new java.util.Date().getTime();
+           long passwordExpiryTime = user.getExpiryDate().getTime();
+
+           if(currentTime >= passwordExpiryTime)
+           {
+               passwordExpired = true;
+
+           }
+           /*else
+           {
+               if((passwordExpiryTime - currentTime) < notification*30*24*60*60*1000L)
+               {
+                   //TODO: MESSAGE FOR NOTIFICATION OF PASSWORD EXPIRY
+               }
+           }*/
+       }
+       return passwordExpired;
+    }
+
+    /*public static String getPasswordExpiryTime(String userName)
+    {
+        UserManager userManager = JxServiceLocator.lookup("cmp.sm.UserManagerEJB");        
+        long diff = 0L;
+        String passwordExpiryTime = "0";
+        UserTO user = userManager.getUser(userName);
+        if(!(null == user || null == user.getExpiryDate())){
+            diff = user.getExpiryDate().getTime() - System.currentTimeMillis();
+            if( diff <= 0 )
+            {
+            	passwordExpiryTime = null;
+            }
+            else
+            {
+            	int hours = (int)(diff % (1000L * 60 * 60 * 24));
+                hours = hours / (1000 * 3600);
+                diff = diff/(1000L * 60 * 60 * 24);
+                int passwordExpiryNotificationDuration = getPasswordExpiryNotificationDuration();
+                if( diff < passwordExpiryNotificationDuration )
+                {
+                	if( diff == 0 )
+                    {
+                    	passwordExpiryTime = (int)hours + " hour(s)";
+                    }
+                    else
+                    {
+                    	passwordExpiryTime = (int)diff + " day(s)";
+                    }
+                	
+                	
+                	
+                	
+                	long var = user.getExpiryDate().getTime();
+            		System.out.println("var:: " + var);
+            		
+            		Timestamp time = new Timestamp(var);
+            		String str1 = time.toGMTString();
+            		String str2 = time.toLocaleString();
+            		System.out.println("str1 :: " + str1);
+            		System.out.println("str2 :: " + str2);
+            		
+            		passwordExpiryTime = String.valueOf(var);
+                }
+                else
+                {
+                	passwordExpiryTime = null;
+                }
+            }
+        }
+        System.out.println("Password expiry time:: " +  passwordExpiryTime);
+        return passwordExpiryTime;
+    }*/
+    
+    public static long getPasswordExpiryTime(String userName)
+    {
+        UserManager userManager = JxServiceLocator.lookup("cmp.sm.UserManagerEJB");        
+        long diff = 0L;
+        long passwordExpiryTime = 0L;
+        
+        UserTO user = userManager.getUser(userName);
+        if((user != null) && (user.getExpiryDate() != null) && (user.getPassword() != null)){
+            diff = user.getExpiryDate().getTime() - System.currentTimeMillis();
+            
+            if( diff <= 0 )
+            {
+            	passwordExpiryTime = 0L;
+            }
+            else
+            {
+            	diff = diff/(1000L * 60 * 60 * 24);
+                int passwordExpiryNotificationDuration = getPasswordExpiryNotificationDuration();
+                if( diff < passwordExpiryNotificationDuration )
+                {
+                	
+                	long var = user.getExpiryDate().getTime();
+            		System.out.println("var:: " + var);
+            		
+            		passwordExpiryTime = var;
+                }
+                else
+                {
+                	passwordExpiryTime = 0L;
+                }
+            }
+        }
+        System.out.println("Password expiry time:: " +  passwordExpiryTime);
+        return passwordExpiryTime;
+    }
+
+    public static int getPasswordExpiryNotificationDuration(){
+        int notification = 0;
+        try
+        {
+            AppSettingsManager applicationManager
+                = (AppSettingsManager) JxServiceLocator.lookup("cmp.configTemplate.AppSettingsManagerEJB");
+            if(!(applicationManager.getLeafNodeValueByPath("cmp", "/configuration/Password/Time-interval-for-password-expiry-notification-in-months", null).equals(""))){	
+            	String notify = applicationManager.getLeafNodeValueByPath("cmp", "/configuration/Password/Time-interval-for-password-expiry-notification-in-months", null);
+
+                //Now convert this string into double and then round off to make it an Integer
+                double x = Double.parseDouble(notify);
+                if(x <= 1.0)
+                	x = 1.0;
+                notification = (int)Math.round(x);
+            }
+        }catch(Exception e)
+        {
+            e.printStackTrace();
+        }
+
+        System.out.println("notification :: " + notification);
+        return notification*30;
+    }
+}

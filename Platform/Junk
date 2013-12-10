@@ -1,0 +1,492 @@
+package com.ps.platform.users.ejb;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.jboss.logging.Logger;
+
+import com.ps.platform.users.jpa.PropertyEntity;
+import com.ps.platform.users.jpa.Queries;
+import com.ps.platform.users.jpa.RoleEntity;
+import com.ps.platform.users.jpa.UserEntity;
+import com.ps.shared.dataobjects.Properties;
+import com.ps.shared.dataobjects.Property;
+import com.ps.shared.dataobjects.User;
+import com.ps.shared.dataobjects.Users;
+import com.ps.shared.email.Email;
+import com.ps.shared.email.EmailSender;
+import com.ps.shared.exception.ApplicationException;
+import com.ps.shared.interfaces.UserManager;
+@Stateless
+public class UserManagerBean implements UserManager {
+
+	Logger logger = Logger.getLogger(UserManagerBean.class.getName());
+	
+	@PersistenceContext(unitName="platform")
+	private EntityManager em;
+	
+	@Resource 
+	private SessionContext session;
+
+	@Override
+	public void initDB() throws ApplicationException 
+	{
+		try {
+			List<User> users = getAllUsers();
+			if(users.size() == 0) {
+				initialize();
+			}			
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing getAllUsers Operation :: " + e.getMessage();
+			logger.error(errorMsg);
+			throw new ApplicationException(errorMsg);
+		}
+		
+	}
+	
+	private void initialize()
+	{						
+		RoleEntity adminRole = new RoleEntity();
+		adminRole.setName("ADMIN");		
+		em.persist(adminRole);
+				
+		RoleEntity teacherRole = new RoleEntity();
+		teacherRole.setName("TEACHER");
+		em.persist(teacherRole);
+		
+		RoleEntity studentRole = new RoleEntity();
+		studentRole.setName("STUDENT");		
+		em.persist(studentRole);
+				
+		RoleEntity parentRole = new RoleEntity();
+		parentRole.setName("PARENT");
+		em.persist(parentRole);
+		
+		UserEntity adminUser = new UserEntity();
+		adminUser.setName("super");
+		adminUser.setEmail("admin@sms.com");
+		adminUser.setPassword("admin123");		
+		adminUser.setRole(adminRole);		
+		em.persist(adminUser);
+	}
+	
+	@Override
+	@TransactionAttribute(TransactionAttributeType.REQUIRED)
+	public void addUser(User user) throws ApplicationException {
+		try {
+			UserEntity userEntity = new UserEntity();
+			userEntity.setEmail(user.getEmail());
+			userEntity.setName(user.getName());
+			
+			String password = "a";//RandomStringUtils.randomAlphanumeric(8);
+			userEntity.setPassword(password);
+			user.setPassword(password);
+			
+			Query query = em.createQuery(Queries.GET_ROLE_BY_NAME);
+			query.setParameter("name", user.getRole());	// TODO ****************** change		
+			RoleEntity roleEntity = (RoleEntity)query.getSingleResult();									
+			userEntity.setRole(roleEntity);
+			
+			userEntity.setAccountActivated(false);
+										
+			EmailSender.sendRegistrationConfirmationEmail(user);  
+			
+			em.persist(userEntity);	
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing addUser operation :: " + e.getMessage();
+			logger.error(errorMsg);
+			throw new ApplicationException(errorMsg);
+		}
+		
+	}
+
+	@Override
+	public void deleteUser(int userId) throws ApplicationException 
+	{		
+		try {
+			UserEntity user = em.find(UserEntity.class, userId);
+			em.remove(user);
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing deleteUser operation :: " + e.getMessage();
+			logger.error(errorMsg);
+			throw new ApplicationException(errorMsg);
+		}
+	}
+
+	@Override
+	public void modifyUser(User user) throws ApplicationException 
+	{
+		try {			
+			UserEntity userEntity = getCurrentUser();
+			if(userEntity.getRole().getName().equals("ADMIN")){
+				userEntity = getUserEntityByEmail(user.getEmail());
+			}
+			if(userEntity != null) {
+				userEntity.setPassword(user.getPassword());
+				userEntity.setAddress(user.getAddress());
+				userEntity.setCountry(user.getCountry());
+				userEntity.setRegistrationComplete(user.isRegistrationComplete());
+				//userEntity.setName(user.getName());
+				userEntity.setPhone(user.getPhone());	
+				userEntity.setReferer(user.getReferer());
+				userEntity.setHowDidYouComeToKnow(user.getHowDidYouComeToKnow());
+			}
+			else {
+				String errorMsg = "Failed when executing modifyUser operation :: No such user.";
+				logger.error(errorMsg);				
+				throw new ApplicationException("No such user");
+			}				
+						
+			
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing modifyUser operation :: " + e.getMessage();
+			logger.error(errorMsg);
+			throw new ApplicationException(errorMsg);			
+		}
+		
+	}
+
+	@Override
+	public User getUserById(int userId) throws ApplicationException 
+	{
+		try {
+			UserEntity userEntity = em.find(UserEntity.class, userId);
+			if(userEntity != null) {
+				User user = new User();
+				user.setId(userEntity.getId());
+				user.setName(userEntity.getName());
+				user.setEmail(userEntity.getEmail());
+				return user;			
+			}
+			return null;			
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing getUserById operation :: " + e.getMessage();
+			logger.error(errorMsg);
+			throw new ApplicationException(errorMsg);			
+		}
+	}
+
+	private UserEntity getCurrentUser()
+	{
+		String principal = session.getCallerPrincipal().getName();
+		if(principal != null) {
+			UserEntity userEntity = getUserEntityByEmail(principal);
+			return userEntity;
+		}
+		return null;
+	}
+	
+	private UserEntity getUserEntityByEmail(String email)
+	{
+		try {
+			Query query = em.createQuery(Queries.GET_USER_BY_EMAIL);
+			query.setParameter("email", email);
+			
+			UserEntity userEntity = (UserEntity)query.getSingleResult();
+			if(userEntity != null) {
+				return userEntity;
+			}
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing getUserByEmail Operation :: " + e.getMessage();
+			logger.error(errorMsg);	
+			logger.error(e);
+		}
+		return null;
+	}
+	
+	@Override
+	public Properties getUserPropertiesByEmail(String email)
+	{
+		try {
+			Query query = em.createQuery(Queries.GET_PROPERTIES_BY_EMAIL);
+			query.setParameter("email", email);
+			
+			List<PropertyEntity> propertyList = (List<PropertyEntity>)query.getResultList();
+			List<Property> props = new ArrayList<Property>();
+			
+			for(PropertyEntity propertyEntity: propertyList) {
+				Property property = new Property();
+				property.setId(propertyEntity.getId());
+				property.setPhone(propertyEntity.getPhone());
+				property.setPropertyAddress(propertyEntity.getPropertyAddress());
+				property.setPropertyName(propertyEntity.getPropertyName());
+				property.setServiceType(propertyEntity.getServiceType());
+				property.setSubscriptionType(propertyEntity.getSubscriptionType());
+				
+				props.add(property);
+			}
+			
+			Properties properties = new Properties();
+			properties.setProperties(props);
+			
+			return properties;			
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing getUserPropertiesByEmail Operation for user "+email+" :: " + e.getMessage();
+			logger.error(errorMsg);	
+			logger.error(e);
+			
+		}
+		return null;
+	}
+	
+	
+	@Override
+	public User getUser() throws ApplicationException {
+		UserEntity userEntity = getCurrentUser();
+		if(userEntity != null) {
+			return getUser(userEntity);
+		}
+		return null;
+	}
+	
+	private User getUser(UserEntity userEntity)
+	{
+		User user = new User();
+		
+		user.setAddress(userEntity.getAddress());
+		user.setCountry(userEntity.getCountry());
+		user.setEmail(userEntity.getEmail());
+		user.setName(userEntity.getName());
+		user.setPhone(userEntity.getPhone());
+		user.setRegistrationComplete(userEntity.isRegistrationComplete());
+		user.setRole(userEntity.getRole().getName());		
+		user.setId(userEntity.getId());		
+		user.setHowDidYouComeToKnow(userEntity.getHowDidYouComeToKnow());
+		user.setReferer(userEntity.getReferer());
+		return user;
+	}
+	@Override
+	public User getUserByName(String userName) throws ApplicationException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public List<User> getAllUsers() throws ApplicationException {
+		try {			
+			Query query = em.createQuery(Queries.GET_ALL_USERS);
+			List<UserEntity> userEntityList = query.getResultList();
+			List<User> userList = new ArrayList<User>();
+			for(UserEntity userEntity: userEntityList) {
+				User user = new User();
+				user.setId(userEntity.getId());
+				user.setName(userEntity.getName());
+				user.setEmail(userEntity.getEmail());	
+				userList.add(user);
+			}
+			return userList;			
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing getAllUsers operation :: " + e.getMessage();
+			logger.error(errorMsg);
+			throw new ApplicationException(errorMsg);						
+		}
+	}
+	
+	// TODO - chk n remove, same as getAllusers, but diff return type, 
+	// also, all the fields of user DO's are updated from entity
+	@Override
+	public Users getAllUserList(int start,int limit,String searchFilter) throws ApplicationException {
+		logger.debug("In getAllUserList ");
+		logger.debug("searchFilter :: "+searchFilter);
+		try {
+			Query query;
+			if(null==searchFilter || "".equals(searchFilter)) {
+				query = em.createQuery(Queries.GET_ALL_USERS);
+				query.setFirstResult(start);
+				query.setMaxResults(limit);
+			} else {
+				query = em.createQuery(Queries.GET_FILTERED_USERS);
+				query.setParameter("filter", "%" + searchFilter + "%");
+			}
+			List<UserEntity> userEntityList = query.getResultList();
+			List<User> userList = new ArrayList<User>();
+			Users users = new Users();
+			for(UserEntity userEntity: userEntityList) {
+				User user = getUser(userEntity);
+				userList.add(user);
+			}
+			users.setUsers(userList);
+//			query = em.createQuery(Queries.GET_COUNT_ALL_USERS);
+//			Long totalCount = (Long)query.getSingleResult();
+			users.setTotal(userList.size());
+			return users;			
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing getAllUsers operation :: " + e.getMessage();
+			logger.error(errorMsg);
+			throw new ApplicationException(errorMsg);						
+		}
+	}
+
+	@Override
+	public boolean isUserUnique(String email) throws ApplicationException {
+		try {						
+			UserEntity userEntity = getUserEntityByEmail(email);
+			if(userEntity != null) {
+				return (userEntity.getEmail().equals(email))?false:true;
+			}
+			else {
+				return true;
+			}
+		}			
+		catch(Exception e) {
+			String errorMsg = "Failed when executing isUserUnique Operation :: " + e.getMessage();
+			logger.error(errorMsg);
+			return true;
+		}
+	}
+
+	@Override
+	public void addNewProperty(Property property) throws ApplicationException 
+	{		
+		UserEntity userEntity = getCurrentUser();
+		PropertyEntity propertyEntity = new PropertyEntity();
+		propertyEntity.setPropertyName(property.getPropertyName());
+		propertyEntity.setPropertyAddress(property.getPropertyAddress());
+		propertyEntity.setServiceType(property.getServiceType());
+		propertyEntity.setPhone(property.getPhone());
+		propertyEntity.setCouponCode(property.getCouponCode());
+		propertyEntity.setCurrentResidence(property.getCurrentResidence());
+		propertyEntity.setFrequency(property.getFrequency());
+		
+		propertyEntity.setUser(userEntity);
+		
+		em.persist(propertyEntity);
+	}
+	
+	private PropertyEntity getPropertyEntity(String propertyName) throws Exception
+	{
+		UserEntity userEntity = getCurrentUser();
+		Query query = em.createQuery(Queries.GET_PROPERTY_BY_PROP_NAME_AND_EMAIL);
+		query.setParameter("email", userEntity.getEmail());
+		query.setParameter("propertyName", propertyName);
+		
+		PropertyEntity propEntity = (PropertyEntity)query.getSingleResult();
+		return propEntity;
+	}
+	
+	@Override
+	public void markPropertyLocation(Property property) throws ApplicationException
+	{
+		try {
+			PropertyEntity propEntity = getPropertyEntity(property.getPropertyName());
+			if(propEntity != null) {
+				propEntity.setLatitude(property.getLatitude());
+				propEntity.setLongitude(property.getLongitude());
+			}
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing markPropertyLocation Operation for property "+property.getPropertyName()+" :: " + e.getMessage();
+			logger.error(errorMsg);	
+			logger.error(e);
+			throw new ApplicationException(errorMsg);
+		}					
+		
+	}
+	
+	@Override
+	public Property getProperty(String propertyName)
+	{
+		try {
+			PropertyEntity propEntity = getPropertyEntity(propertyName);
+			if(propEntity != null) {
+				Property property = new Property();
+				property.setLatitude(propEntity.getLatitude());
+				property.setLongitude(propEntity.getLongitude());
+				property.setPhone(propEntity.getPhone());
+				property.setPropertyAddress(propEntity.getPropertyAddress());
+				property.setPropertyName(propEntity.getPropertyName());
+				property.setServiceType(propEntity.getServiceType());
+				property.setSubscriptionType(propEntity.getSubscriptionType());
+				
+				return property;
+			}
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing getProperty Operation for property "+propertyName+" :: " + e.getMessage();
+			logger.error(errorMsg);	
+			logger.error(e);
+			
+		}	
+		return null;
+	}
+
+	@Override
+	public List<Property> getAllProperties() throws ApplicationException 
+	{
+		UserEntity userEntity = getCurrentUser();
+		List<PropertyEntity> propEntities = userEntity.getProperties();
+		List<Property> properties = new ArrayList<Property>();
+		
+		for(PropertyEntity propEntity: propEntities) {
+			Property property = new Property();
+			property.setId(propEntity.getId());
+			property.setPropertyAddress(propEntity.getPropertyAddress());
+			property.setPropertyName(propEntity.getPropertyName());
+			property.setServiceType(propEntity.getServiceType());
+			property.setSubscriptionType(propEntity.getSubscriptionType());
+			
+			properties.add(property);
+		}
+		
+		return properties;
+	}
+	
+	@Override
+	public void forgotPassword(String email) throws ApplicationException
+	{
+		try {
+			Query query = em.createQuery(Queries.GET_USER_BY_EMAIL);
+			query.setParameter("email", email);
+			
+			UserEntity userEntity = (UserEntity)query.getSingleResult();
+			if(userEntity != null) {
+				String password = userEntity.getPassword();
+				StringBuilder body = new StringBuilder();
+				body.append("Dear ").append(userEntity.getName()).append(", ")
+				.append("<BR><BR>")
+				.append("This is your password to login into the system - <B>").append(password).append("</B>")
+				.append("<BR><BR>")
+				.append("Thankyou and have a great day!")
+				.append("<BR>")
+				.append("Your's Sincerely,")
+				.append("<BR>")
+				.append("The Bhurakshan Team.");
+				
+				Email emailObj = new Email();				
+				emailObj.setBody(body.toString());
+				emailObj.setSubject("Bhurakshan: Forgot Password Request");
+				emailObj.setTo(email);
+				
+				EmailSender.sendEMail(emailObj);
+			}
+		}
+		catch(Exception e) {
+			String errorMsg = "Failed when executing forgotPassword Operation for email "+email+" :: " + e.getMessage();
+			logger.error(errorMsg);	
+			logger.error(e);
+			throw new ApplicationException(errorMsg);
+		}		
+	}
+
+
+	 
+}
