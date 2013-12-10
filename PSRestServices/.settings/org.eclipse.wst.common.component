@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-modules id="moduleCoreId" project-version="1.5.0">
+    <wb-module deploy-name="PSRestServices">
+        <wb-resource deploy-path="/" source-path="/web" tag="defaultRootSource"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/web-src"/>
+        <dependent-module archiveName="recaptcha4j-0.0.7.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib//home/vinutht/Vinuth/BhuRakshan/PS/Libraries/ReCaptcha/recaptcha4j-0.0.7.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="xmpcore.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/PSRestServices/web/WEB-INF/lib/xmpcore.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <dependent-module archiveName="metadata-extractor-2.6.2.jar" deploy-path="/WEB-INF/lib" handle="module:/classpath/lib/PSRestServices/web/WEB-INF/lib/metadata-extractor-2.6.2.jar">
+            <dependency-type>uses</dependency-type>
+        </dependent-module>
+        <property name="context-root" value="ps"/>
+        <property name="java-output-path" value="/PSRestServices/build/classes"/>
+    </wb-module>
+</project-modules>

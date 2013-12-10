@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="web-src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/MY-JDK">
+		<attributes>
+			<attribute name="owner.project.facets" value="java"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.jst.server.core.container/org.jboss.ide.eclipse.as.core.server.runtime.runtimeTarget/JBoss 7.1 Runtime">
+		<attributes>
+			<attribute name="owner.project.facets" value="jst.web"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.web.container"/>
+	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.module.container"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/Shared"/>
+	<classpathentry kind="lib" path="../Libraries/jackson-annotations-2.0.4.jar"/>
+	<classpathentry kind="lib" path="../Libraries/jackson-core-2.0.4.jar"/>
+	<classpathentry kind="lib" path="../Libraries/jackson-databind-2.0.4.jar"/>
+	<classpathentry kind="lib" path="../Libraries/ApacheIO/commons-io-2.4.jar"/>
+	<classpathentry kind="lib" path="../Libraries/ReCaptcha/recaptcha4j-0.0.7.jar"/>
+	<classpathentry kind="lib" path="../Libraries/metadata-extractor-2.6.2/metadata-extractor-2.6.2.jar"/>
+	<classpathentry kind="lib" path="../Libraries/metadata-extractor-2.6.2/xmpcore.jar"/>
+	<classpathentry kind="output" path="build/classes"/>
+</classpath>
