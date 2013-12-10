@@ -1,0 +1,43 @@
+<project name="combinejscss" basedir="." default="minify">
+  <property name="gen.output.dir" value="${basedir}/../build/CombinedJsCss"/>
+  <property name="js.properties.file.dir"  value="${basedir}/../web/web/WEB-INF/js"/>
+  <property name="css.properties.file.dir"  value="${basedir}/../web/web/WEB-INF/css"/>
+  <property name="js-min.dir"  value="${gen.output.dir}/js/min/"/>  
+  <property name="gen.build.dir" value="${basedir}/../build/classes"/>
+
+
+  <path id="gen.sourcepath">
+    <dirset dir="${basedir}/../build">
+    </dirset>
+  </path>
+
+  <target name="clean.build" description="cleanup build">
+    <delete dir="${gen.build.dir}"/>
+    <delete dir="${gen.output.dir}"/>
+    <delete dir="${sm-web-combined-dir}"/>
+    <mkdir dir="${gen.build.dir}"/>
+    <mkdir dir="${gen.output.dir}"/>
+    <mkdir dir="${gen.output.dir}/js"/>
+    <mkdir dir="${gen.output.dir}/css"/>
+  </target>
+
+  <target name="combinejscss" depends="clean.build">
+    <echo message="Compiling CombineJsCss"/>
+    <javac destdir="${gen.build.dir}" debug="true" fork="true">
+      <src refid="gen.sourcepath"/>
+    </javac>
+    <echo message="Running CombineJsCss"/>
+    <java classname="CombineJsCss" failonerror="true">
+      <arg value="${basedir}/.."/>
+         <arg value="${js.properties.file.dir}"/>
+         <arg value="${css.properties.file.dir}"/>
+         <arg value="${gen.output.dir}"/>
+         <classpath><pathelement location="${gen.build.dir}"/></classpath>
+       </java>
+  </target>
+
+  <target name="minify" depends="combinejscss">
+  </target>
+
+</project>
+
